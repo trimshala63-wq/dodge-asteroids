@@ -146,61 +146,66 @@ button:hover {
 
 <div class="container">
 
-    <h1>🚀 Dodge Asteroids</h1>
+<h1>🚀 Dodge Asteroids</h1>
 
-    <div class="subtitle">
-        Dodge the asteroids and survive as long as you can!
-    </div>
+<div class="subtitle">
+Dodge, shoot, and survive!
+</div>
 
-    <div class="hud">
-        <div>Score: <span id="score">0</span></div>
-        <div>Best: <span id="best">0</span></div>
-        <div>Speed: <span id="speed">1.0x</span></div>
-    </div>
+<div class="hud">
+    <div>Score: <span id="score">0</span></div>
+    <div>Best: <span id="best">0</span></div>
+    <div>Speed: <span id="speed">1.0x</span></div>
+    <div>Asteroids Destroyed: <span id="destroyed">0</span></div>
+</div>
 
-    <div class="game-container">
+<div class="game-container">
 
-        <canvas id="game" width="1000" height="620"></canvas>
+<canvas id="game" width="1000" height="620"></canvas>
 
-        <div class="overlay" id="overlay">
+<div class="overlay" id="overlay">
 
-            <div class="menu">
+<div class="menu">
 
-                <h2 id="menuTitle">Dodge Asteroids</h2>
+<h2 id="menuTitle">🚀 Dodge Asteroids</h2>
 
-                <p id="menuMessage">
-                    Asteroids are coming from every direction!
-                </p>
+<p id="menuMessage">
+Dodge the asteroids and destroy them with your lasers!
+</p>
 
-                <button id="startButton">
-                    🚀 Start Game
-                </button>
+<button id="startButton">
+🚀 Start Game
+</button>
 
-                <div class="instructions">
-                    <b>Keyboard:</b><br>
-                    Arrow Keys or WASD<br><br>
-                    Move in all four directions and avoid the asteroids.
-                </div>
+<div class="instructions">
+<b>Move:</b> WASD or Arrow Keys<br>
+<b>Shoot:</b> Spacebar<br><br>
+Destroy asteroids for bonus points!
+</div>
 
-            </div>
+</div>
 
-        </div>
+</div>
 
-    </div>
+</div>
 
-    <div class="mobile-controls">
+<div class="mobile-controls">
 
-        <div>
-            <button data-key="ArrowUp">▲</button>
-        </div>
+<div>
+<button data-key="ArrowUp">▲</button>
+</div>
 
-        <div>
-            <button data-key="ArrowLeft">◀</button>
-            <button data-key="ArrowDown">▼</button>
-            <button data-key="ArrowRight">▶</button>
-        </div>
+<div>
+<button data-key="ArrowLeft">◀</button>
+<button data-key="ArrowDown">▼</button>
+<button data-key="ArrowRight">▶</button>
+</div>
 
-    </div>
+<div>
+<button id="mobileShoot">🔴 SHOOT</button>
+</div>
+
+</div>
 
 </div>
 
@@ -212,6 +217,7 @@ const ctx = canvas.getContext("2d");
 const scoreDisplay = document.getElementById("score");
 const bestDisplay = document.getElementById("best");
 const speedDisplay = document.getElementById("speed");
+const destroyedDisplay = document.getElementById("destroyed");
 
 const overlay = document.getElementById("overlay");
 const menuTitle = document.getElementById("menuTitle");
@@ -219,15 +225,21 @@ const menuMessage = document.getElementById("menuMessage");
 const startButton = document.getElementById("startButton");
 
 let keys = {};
+
 let asteroids = [];
+let lasers = [];
+let particles = [];
 let stars = [];
 
 let running = false;
+
 let score = 0;
 let best = Number(localStorage.getItem("dodgeAsteroidsBest")) || 0;
+let destroyed = 0;
 
 let lastTime = 0;
 let spawnTimer = 0;
+let shootCooldown = 0;
 
 bestDisplay.textContent = best;
 
@@ -237,10 +249,15 @@ bestDisplay.textContent = best;
 ========================= */
 
 const player = {
+
     x: canvas.width / 2,
+
     y: canvas.height / 2,
+
     radius: 18,
+
     speed: 260
+
 };
 
 
@@ -251,10 +268,15 @@ const player = {
 for (let i = 0; i < 150; i++) {
 
     stars.push({
+
         x: Math.random() * canvas.width,
+
         y: Math.random() * canvas.height,
+
         size: Math.random() * 2,
+
         speed: 10 + Math.random() * 20
+
     });
 
 }
@@ -275,10 +297,13 @@ window.addEventListener("keydown", function(event) {
         event.key === "ArrowRight" ||
         event.key === " "
     ) {
+
         event.preventDefault();
+
     }
 
 });
+
 
 window.addEventListener("keyup", function(event) {
 
@@ -288,7 +313,7 @@ window.addEventListener("keyup", function(event) {
 
 
 /* =========================
-   START GAME
+   START
 ========================= */
 
 function startGame() {
@@ -297,11 +322,17 @@ function startGame() {
     player.y = canvas.height / 2;
 
     asteroids = [];
+    lasers = [];
+    particles = [];
 
     score = 0;
+    destroyed = 0;
+
     spawnTimer = 0;
+    shootCooldown = 0;
 
     scoreDisplay.textContent = "0";
+    destroyedDisplay.textContent = "0";
     speedDisplay.textContent = "1.0x";
 
     running = true;
@@ -311,6 +342,7 @@ function startGame() {
     lastTime = performance.now();
 
     requestAnimationFrame(gameLoop);
+
 }
 
 
@@ -334,6 +366,7 @@ function gameOver() {
         );
 
         bestDisplay.textContent = best;
+
     }
 
     menuTitle.textContent = "💥 Game Over";
@@ -341,11 +374,14 @@ function gameOver() {
     menuMessage.innerHTML =
         "You scored <b>" +
         finalScore +
-        "</b> points!";
+        "</b> points and destroyed <b>" +
+        destroyed +
+        "</b> asteroids!";
 
     startButton.textContent = "🔄 Play Again";
 
     overlay.classList.remove("hidden");
+
 }
 
 
@@ -355,7 +391,8 @@ function gameOver() {
 
 function createAsteroid() {
 
-    const side = Math.floor(Math.random() * 4);
+    const side =
+        Math.floor(Math.random() * 4);
 
     let x;
     let y;
@@ -364,25 +401,21 @@ function createAsteroid() {
 
     if (side === 0) {
 
-        // left
         x = -distance;
         y = Math.random() * canvas.height;
 
     } else if (side === 1) {
 
-        // right
         x = canvas.width + distance;
         y = Math.random() * canvas.height;
 
     } else if (side === 2) {
 
-        // top
         x = Math.random() * canvas.width;
         y = -distance;
 
     } else {
 
-        // bottom
         x = Math.random() * canvas.width;
         y = canvas.height + distance;
 
@@ -394,8 +427,11 @@ function createAsteroid() {
     const distanceToPlayer =
         Math.sqrt(dx * dx + dy * dy);
 
-    const directionX = dx / distanceToPlayer;
-    const directionY = dy / distanceToPlayer;
+    const directionX =
+        dx / distanceToPlayer;
+
+    const directionY =
+        dy / distanceToPlayer;
 
     const baseSpeed =
         80 +
@@ -405,6 +441,7 @@ function createAsteroid() {
     asteroids.push({
 
         x: x,
+
         y: y,
 
         radius:
@@ -420,7 +457,9 @@ function createAsteroid() {
             baseSpeed,
 
         rotation:
-            Math.random() * Math.PI * 2,
+            Math.random() *
+            Math.PI *
+            2,
 
         rotationSpeed:
             (Math.random() - 0.5) * 2,
@@ -437,7 +476,270 @@ function createAsteroid() {
 
 
 /* =========================
-   UPDATE PLAYER
+   SHOOT LASER
+========================= */
+
+function shootLaser() {
+
+    if (!running) {
+        return;
+    }
+
+    if (shootCooldown > 0) {
+        return;
+    }
+
+    shootCooldown = 0.18;
+
+    lasers.push({
+
+        x: player.x + 22,
+
+        y: player.y,
+
+        speed: 650,
+
+        length: 18
+
+    });
+
+}
+
+
+/* =========================
+   UPDATE LASERS
+========================= */
+
+function updateLasers(delta) {
+
+    for (const laser of lasers) {
+
+        laser.x +=
+            laser.speed *
+            delta;
+
+    }
+
+    lasers =
+        lasers.filter(function(laser) {
+
+            return laser.x <
+                canvas.width + 50;
+
+        });
+
+}
+
+
+/* =========================
+   DRAW LASERS
+========================= */
+
+function drawLasers() {
+
+    for (const laser of lasers) {
+
+        ctx.save();
+
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#ff3b3b";
+
+        ctx.strokeStyle = "#ff4b4b";
+        ctx.lineWidth = 5;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            laser.x - laser.length,
+            laser.y
+        );
+
+        ctx.lineTo(
+            laser.x,
+            laser.y
+        );
+
+        ctx.stroke();
+
+        ctx.restore();
+
+    }
+
+}
+
+
+/* =========================
+   LASER COLLISIONS
+========================= */
+
+function checkLaserCollisions() {
+
+    for (let i = lasers.length - 1; i >= 0; i--) {
+
+        const laser = lasers[i];
+
+        for (
+            let j = asteroids.length - 1;
+            j >= 0;
+            j--
+        ) {
+
+            const asteroid =
+                asteroids[j];
+
+            const dx =
+                laser.x -
+                asteroid.x;
+
+            const dy =
+                laser.y -
+                asteroid.y;
+
+            const distance =
+                Math.sqrt(
+                    dx * dx +
+                    dy * dy
+                );
+
+            if (
+                distance <
+                asteroid.radius + 8
+            ) {
+
+                createExplosion(
+                    asteroid.x,
+                    asteroid.y
+                );
+
+                asteroids.splice(j, 1);
+
+                lasers.splice(i, 1);
+
+                destroyed++;
+
+                score += 25;
+
+                destroyedDisplay.textContent =
+                    destroyed;
+
+                break;
+
+            }
+
+        }
+
+    }
+
+}
+
+
+/* =========================
+   EXPLOSION
+========================= */
+
+function createExplosion(x, y) {
+
+    for (let i = 0; i < 18; i++) {
+
+        const angle =
+            Math.random() *
+            Math.PI *
+            2;
+
+        const speed =
+            50 +
+            Math.random() *
+            160;
+
+        particles.push({
+
+            x: x,
+
+            y: y,
+
+            vx:
+                Math.cos(angle) *
+                speed,
+
+            vy:
+                Math.sin(angle) *
+                speed,
+
+            life: 1
+
+        });
+
+    }
+
+}
+
+
+/* =========================
+   UPDATE PARTICLES
+========================= */
+
+function updateParticles(delta) {
+
+    for (const particle of particles) {
+
+        particle.x +=
+            particle.vx *
+            delta;
+
+        particle.y +=
+            particle.vy *
+            delta;
+
+        particle.life -=
+            delta * 2;
+
+    }
+
+    particles =
+        particles.filter(
+            p => p.life > 0
+        );
+
+}
+
+
+/* =========================
+   DRAW PARTICLES
+========================= */
+
+function drawParticles() {
+
+    for (const particle of particles) {
+
+        ctx.globalAlpha =
+            Math.max(
+                0,
+                particle.life
+            );
+
+        ctx.fillStyle = "#ffb13b";
+
+        ctx.beginPath();
+
+        ctx.arc(
+            particle.x,
+            particle.y,
+            3,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+    }
+
+    ctx.globalAlpha = 1;
+
+}
+
+
+/* =========================
+   PLAYER MOVEMENT
 ========================= */
 
 function updatePlayer(delta) {
@@ -445,24 +747,39 @@ function updatePlayer(delta) {
     let dx = 0;
     let dy = 0;
 
-    if (keys["ArrowLeft"] || keys["a"]) {
-        dx -= 1;
+    if (
+        keys["ArrowLeft"] ||
+        keys["a"]
+    ) {
+        dx--;
     }
 
-    if (keys["ArrowRight"] || keys["d"]) {
-        dx += 1;
+    if (
+        keys["ArrowRight"] ||
+        keys["d"]
+    ) {
+        dx++;
     }
 
-    if (keys["ArrowUp"] || keys["w"]) {
-        dy -= 1;
+    if (
+        keys["ArrowUp"] ||
+        keys["w"]
+    ) {
+        dy--;
     }
 
-    if (keys["ArrowDown"] || keys["s"]) {
-        dy += 1;
+    if (
+        keys["ArrowDown"] ||
+        keys["s"]
+    ) {
+        dy++;
     }
 
     const length =
-        Math.sqrt(dx * dx + dy * dy);
+        Math.sqrt(
+            dx * dx +
+            dy * dy
+        );
 
     if (length > 0) {
 
@@ -481,13 +798,12 @@ function updatePlayer(delta) {
 
     }
 
-    // Keep player inside screen
-
     player.x =
         Math.max(
             player.radius,
             Math.min(
-                canvas.width - player.radius,
+                canvas.width -
+                player.radius,
                 player.x
             )
         );
@@ -496,7 +812,8 @@ function updatePlayer(delta) {
         Math.max(
             player.radius,
             Math.min(
-                canvas.height - player.radius,
+                canvas.height -
+                player.radius,
                 player.y
             )
         );
@@ -505,14 +822,17 @@ function updatePlayer(delta) {
 
 
 /* =========================
-   UPDATE ASTEROIDS
+   ASTEROID MOVEMENT
 ========================= */
 
 function updateAsteroids(delta) {
 
     const difficulty =
         1 +
-        Math.min(score / 650, 1.7);
+        Math.min(
+            score / 650,
+            1.7
+        );
 
     for (const asteroid of asteroids) {
 
@@ -537,9 +857,11 @@ function updateAsteroids(delta) {
 
             return (
                 asteroid.x > -120 &&
-                asteroid.x < canvas.width + 120 &&
+                asteroid.x <
+                    canvas.width + 120 &&
                 asteroid.y > -120 &&
-                asteroid.y < canvas.height + 120
+                asteroid.y <
+                    canvas.height + 120
             );
 
         });
@@ -548,10 +870,10 @@ function updateAsteroids(delta) {
 
 
 /* =========================
-   COLLISION
+   PLAYER COLLISION
 ========================= */
 
-function checkCollision() {
+function checkPlayerCollision() {
 
     for (const asteroid of asteroids) {
 
@@ -597,15 +919,23 @@ function drawStars(delta) {
 
     for (const star of stars) {
 
-        star.y += star.speed * delta;
+        star.y +=
+            star.speed *
+            delta;
 
-        if (star.y > canvas.height) {
+        if (
+            star.y >
+            canvas.height
+        ) {
+
             star.y = 0;
+
         }
 
         ctx.globalAlpha =
             0.3 +
-            Math.random() * 0.6;
+            Math.random() *
+            0.6;
 
         ctx.beginPath();
 
@@ -672,9 +1002,13 @@ function drawAsteroids() {
                 radius;
 
             if (i === 0) {
+
                 ctx.moveTo(x, y);
+
             } else {
+
                 ctx.lineTo(x, y);
+
             }
 
         }
@@ -685,7 +1019,6 @@ function drawAsteroids() {
         ctx.fill();
 
         ctx.strokeStyle = "#aeb7ca";
-        ctx.lineWidth = 1.5;
         ctx.stroke();
 
         ctx.restore();
@@ -708,20 +1041,6 @@ function drawPlayer() {
         player.y
     );
 
-    let rotation = 0;
-
-    if (keys["ArrowLeft"] || keys["a"]) {
-        rotation = -0.2;
-    }
-
-    if (keys["ArrowRight"] || keys["d"]) {
-        rotation = 0.2;
-    }
-
-    ctx.rotate(rotation);
-
-    // Engine flame
-
     ctx.fillStyle = "#ffad32";
 
     ctx.beginPath();
@@ -734,8 +1053,6 @@ function drawPlayer() {
     ctx.closePath();
 
     ctx.fill();
-
-    // Rocket
 
     ctx.fillStyle = "#e9f1ff";
 
@@ -752,8 +1069,6 @@ function drawPlayer() {
 
     ctx.strokeStyle = "#91a4d8";
     ctx.stroke();
-
-    // Window
 
     ctx.fillStyle = "#7457ff";
 
@@ -775,7 +1090,7 @@ function drawPlayer() {
 
 
 /* =========================
-   DRAW GAME
+   DRAW
 ========================= */
 
 function drawGame(delta) {
@@ -786,8 +1101,6 @@ function drawGame(delta) {
         canvas.width,
         canvas.height
     );
-
-    // Background
 
     const gradient =
         ctx.createRadialGradient(
@@ -822,13 +1135,17 @@ function drawGame(delta) {
 
     drawAsteroids();
 
+    drawLasers();
+
+    drawParticles();
+
     drawPlayer();
 
 }
 
 
 /* =========================
-   MAIN LOOP
+   GAME LOOP
 ========================= */
 
 function gameLoop(currentTime) {
@@ -839,7 +1156,8 @@ function gameLoop(currentTime) {
 
     const delta =
         Math.min(
-            (currentTime - lastTime) / 1000,
+            (currentTime - lastTime) /
+            1000,
             0.035
         );
 
@@ -850,7 +1168,10 @@ function gameLoop(currentTime) {
 
     const difficulty =
         1 +
-        Math.min(score / 650, 1.7);
+        Math.min(
+            score / 650,
+            1.7
+        );
 
     speedDisplay.textContent =
         difficulty.toFixed(1) + "x";
@@ -859,6 +1180,14 @@ function gameLoop(currentTime) {
         Math.floor(score);
 
     updatePlayer(delta);
+
+    shootCooldown -= delta;
+
+    if (keys[" "] || keys["Spacebar"]) {
+
+        shootLaser();
+
+    }
 
     spawnTimer -= delta;
 
@@ -875,11 +1204,17 @@ function gameLoop(currentTime) {
 
     }
 
+    updateLasers(delta);
+
     updateAsteroids(delta);
+
+    updateParticles(delta);
+
+    checkLaserCollisions();
 
     drawGame(delta);
 
-    if (checkCollision()) {
+    if (checkPlayerCollision()) {
 
         gameOver();
 
@@ -903,7 +1238,7 @@ startButton.addEventListener(
 
 
 /* =========================
-   MOBILE CONTROLS
+   MOBILE MOVEMENT
 ========================= */
 
 document
@@ -949,7 +1284,28 @@ document
 
 
 /* =========================
-   DRAW INITIAL SCREEN
+   MOBILE SHOOT
+========================= */
+
+const mobileShoot =
+    document.getElementById(
+        "mobileShoot"
+    );
+
+mobileShoot.addEventListener(
+    "pointerdown",
+    function(event) {
+
+        event.preventDefault();
+
+        shootLaser();
+
+    }
+);
+
+
+/* =========================
+   INITIAL SCREEN
 ========================= */
 
 drawGame(0);
