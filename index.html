@@ -1342,3 +1342,110 @@ function shootLaser() {
     });
 
 }
+function updateLasers(delta) {
+
+    for (const laser of lasers) {
+
+        laser.x += laser.vx * delta;
+        laser.y += laser.vy * delta;
+
+    }
+
+    lasers = lasers.filter(function(laser) {
+
+        return (
+            laser.x > -50 &&
+            laser.x < canvas.width + 50 &&
+            laser.y > -50 &&
+            laser.y < canvas.height + 50
+        );
+
+    });
+
+}
+function drawLasers() {
+
+    for (const laser of lasers) {
+
+        const angle = Math.atan2(
+            laser.vy,
+            laser.vx
+        );
+
+        ctx.save();
+
+        ctx.translate(laser.x, laser.y);
+        ctx.rotate(angle);
+
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = "#ff3030";
+
+        ctx.strokeStyle = "#ff4b4b";
+        ctx.lineWidth = 5;
+        ctx.lineCap = "round";
+
+        ctx.beginPath();
+
+        ctx.moveTo(-20, 0);
+        ctx.lineTo(5, 0);
+
+        ctx.stroke();
+
+        ctx.restore();
+
+    }
+
+}
+                        if (length > 0) {
+
+    dx /= length;
+    dy /= length;
+
+    player.angle = Math.atan2(dy, dx);
+
+    player.x += dx * player.speed * delta;
+    player.y += dy * player.speed * delta;
+
+}
+                function drawPlayer() {
+
+    ctx.save();
+
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+
+    // Flame
+    ctx.fillStyle = "#ffad32";
+
+    ctx.beginPath();
+    ctx.moveTo(-18, 0);
+    ctx.lineTo(-31, 8);
+    ctx.lineTo(-25, 0);
+    ctx.lineTo(-31, -8);
+    ctx.closePath();
+    ctx.fill();
+
+    // Rocket body
+    ctx.fillStyle = "#e9f1ff";
+
+    ctx.beginPath();
+    ctx.moveTo(23, 0);
+    ctx.lineTo(-14, -14);
+    ctx.lineTo(-9, 0);
+    ctx.lineTo(-14, 14);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = "#91a4d8";
+    ctx.stroke();
+
+    // Window
+    ctx.fillStyle = "#7457ff";
+
+    ctx.beginPath();
+    ctx.arc(4, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+}
