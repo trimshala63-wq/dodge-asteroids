@@ -1314,3 +1314,31 @@ score += 30;
 
 </body>
 </html>
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    radius: 18,
+    speed: 260,
+    angle: 0
+};
+function shootLaser() {
+
+    if (!running) return;
+
+    if (shootCooldown > 0) return;
+
+    shootCooldown = 0.18;
+
+    lasers.push({
+
+        x: player.x + Math.cos(player.angle) * 25,
+        y: player.y + Math.sin(player.angle) * 25,
+
+        vx: Math.cos(player.angle) * 650,
+        vy: Math.sin(player.angle) * 650,
+
+        length: 20
+
+    });
+
+}
