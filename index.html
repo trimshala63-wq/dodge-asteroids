@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dodge Asteroids 🚀</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #050816;
+    color: white;
+    font-family: Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.container {
+    width: 95%;
+    max-width: 1100px;
+    text-align: center;
+}
+
+h1 {
+    font-size: 42px;
+    margin: 10px 0 5px;
+}
+
+.subtitle {
+    color: #aab5d6;
+    margin-bottom: 15px;
+}
+
+.hud {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.hud div {
+    background: #111936;
+    border: 1px solid #303d70;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-weight: bold;
+}
+
+.game-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 18px;
+    border: 2px solid #303d70;
+    box-shadow: 0 0 40px rgba(60, 80, 180, 0.25);
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    background: #02040c;
+}
+
+.overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 4, 15, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.menu {
+    background: #101735;
+    border: 1px solid #43518a;
+    border-radius: 18px;
+    padding: 30px;
+    width: 90%;
+    max-width: 430px;
+}
+
+.menu h2 {
+    font-size: 32px;
+    margin-top: 0;
+}
+
+button {
+    background: #7457ff;
+    color: white;
+    border: none;
+    padding: 13px 24px;
+    border-radius: 12px;
+    font-size: 17px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #8b72ff;
+}
+
+.hidden {
+    display: none;
+}
+
+.instructions {
+    color: #aab5d6;
+    margin-top: 15px;
+    line-height: 1.6;
+}
+
+.mobile-controls {
+    display: none;
+    margin-top: 15px;
+}
+
+.mobile-controls button {
+    width: 60px;
+    height: 55px;
+    margin: 3px;
+    padding: 0;
+    font-size: 22px;
+    background: #202b55;
+}
+
+@media (max-width: 700px) {
+    h1 {
+        font-size: 30px;
+    }
+
+    .mobile-controls {
+        display: block;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🚀 Dodge Asteroids</h1>
+
+    <div class="subtitle">
+        Dodge the asteroids and survive as long as you can!
+    </div>
+
+    <div class="hud">
+        <div>Score: <span id="score">0</span></div>
+        <div>Best: <span id="best">0</span></div>
+        <div>Speed: <span id="speed">1.0x</span></div>
+    </div>
+
+    <div class="game-container">
+
+        <canvas id="game" width="1000" height="620"></canvas>
+
+        <div class="overlay" id="overlay">
+
+            <div class="menu">
+
+                <h2 id="menuTitle">Dodge Asteroids</h2>
+
+                <p id="menuMessage">
+                    Asteroids are coming from every direction!
+                </p>
+
+                <button id="startButton">
+                    🚀 Start Game
+                </button>
+
+                <div class="instructions">
+                    <b>Keyboard:</b><br>
+                    Arrow Keys or WASD<br><br>
+                    Move in all four directions and avoid the asteroids.
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="mobile-controls">
+
+        <div>
+            <button data-key="ArrowUp">▲</button>
+        </div>
+
+        <div>
+            <button data-key="ArrowLeft">◀</button>
+            <button data-key="ArrowDown">▼</button>
+            <button data-key="ArrowRight">▶</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const scoreDisplay = document.getElementById("score");
+const bestDisplay = document.getElementById("best");
+const speedDisplay = document.getElementById("speed");
+
+const overlay = document.getElementById("overlay");
+const menuTitle = document.getElementById("menuTitle");
+const menuMessage = document.getElementById("menuMessage");
+const startButton = document.getElementById("startButton");
+
+let keys = {};
+let asteroids = [];
+let stars = [];
+
+let running = false;
+let score = 0;
+let best = Number(localStorage.getItem("dodgeAsteroidsBest")) || 0;
+
+let lastTime = 0;
+let spawnTimer = 0;
+
+bestDisplay.textContent = best;
+
+
+/* =========================
+   PLAYER
+========================= */
+
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    radius: 18,
+    speed: 260
+};
+
+
+/* =========================
+   STARS
+========================= */
+
+for (let i = 0; i < 150; i++) {
+
+    stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2,
+        speed: 10 + Math.random() * 20
+    });
+
+}
+
+
+/* =========================
+   KEYBOARD
+========================= */
+
+window.addEventListener("keydown", function(event) {
+
+    keys[event.key] = true;
+
+    if (
+        event.key === "ArrowUp" ||
+        event.key === "ArrowDown" ||
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowRight" ||
+        event.key === " "
+    ) {
+        event.preventDefault();
+    }
+
+});
+
+window.addEventListener("keyup", function(event) {
+
+    keys[event.key] = false;
+
+});
+
+
+/* =========================
+   START GAME
+========================= */
+
+function startGame() {
+
+    player.x = canvas.width / 2;
+    player.y = canvas.height / 2;
+
+    asteroids = [];
+
+    score = 0;
+    spawnTimer = 0;
+
+    scoreDisplay.textContent = "0";
+    speedDisplay.textContent = "1.0x";
+
+    running = true;
+
+    overlay.classList.add("hidden");
+
+    lastTime = performance.now();
+
+    requestAnimationFrame(gameLoop);
+}
+
+
+/* =========================
+   GAME OVER
+========================= */
+
+function gameOver() {
+
+    running = false;
+
+    const finalScore = Math.floor(score);
+
+    if (finalScore > best) {
+
+        best = finalScore;
+
+        localStorage.setItem(
+            "dodgeAsteroidsBest",
+            best
+        );
+
+        bestDisplay.textContent = best;
+    }
+
+    menuTitle.textContent = "💥 Game Over";
+
+    menuMessage.innerHTML =
+        "You scored <b>" +
+        finalScore +
+        "</b> points!";
+
+    startButton.textContent = "🔄 Play Again";
+
+    overlay.classList.remove("hidden");
+}
+
+
+/* =========================
+   CREATE ASTEROID
+========================= */
+
+function createAsteroid() {
+
+    const side = Math.floor(Math.random() * 4);
+
+    let x;
+    let y;
+
+    const distance = 80;
+
+    if (side === 0) {
+
+        // left
+        x = -distance;
+        y = Math.random() * canvas.height;
+
+    } else if (side === 1) {
+
+        // right
+        x = canvas.width + distance;
+        y = Math.random() * canvas.height;
+
+    } else if (side === 2) {
+
+        // top
+        x = Math.random() * canvas.width;
+        y = -distance;
+
+    } else {
+
+        // bottom
+        x = Math.random() * canvas.width;
+        y = canvas.height + distance;
+
+    }
+
+    const dx = player.x - x;
+    const dy = player.y - y;
+
+    const distanceToPlayer =
+        Math.sqrt(dx * dx + dy * dy);
+
+    const directionX = dx / distanceToPlayer;
+    const directionY = dy / distanceToPlayer;
+
+    const baseSpeed =
+        80 +
+        Math.random() * 50 +
+        Math.min(score * 0.5, 70);
+
+    asteroids.push({
+
+        x: x,
+        y: y,
+
+        radius:
+            14 +
+            Math.random() * 25,
+
+        vx:
+            directionX *
+            baseSpeed,
+
+        vy:
+            directionY *
+            baseSpeed,
+
+        rotation:
+            Math.random() * Math.PI * 2,
+
+        rotationSpeed:
+            (Math.random() - 0.5) * 2,
+
+        shape:
+            Array.from(
+                { length: 9 },
+                () => 0.75 + Math.random() * 0.35
+            )
+
+    });
+
+}
+
+
+/* =========================
+   UPDATE PLAYER
+========================= */
+
+function updatePlayer(delta) {
+
+    let dx = 0;
+    let dy = 0;
+
+    if (keys["ArrowLeft"] || keys["a"]) {
+        dx -= 1;
+    }
+
+    if (keys["ArrowRight"] || keys["d"]) {
+        dx += 1;
+    }
+
+    if (keys["ArrowUp"] || keys["w"]) {
+        dy -= 1;
+    }
+
+    if (keys["ArrowDown"] || keys["s"]) {
+        dy += 1;
+    }
+
+    const length =
+        Math.sqrt(dx * dx + dy * dy);
+
+    if (length > 0) {
+
+        dx /= length;
+        dy /= length;
+
+        player.x +=
+            dx *
+            player.speed *
+            delta;
+
+        player.y +=
+            dy *
+            player.speed *
+            delta;
+
+    }
+
+    // Keep player inside screen
+
+    player.x =
+        Math.max(
+            player.radius,
+            Math.min(
+                canvas.width - player.radius,
+                player.x
+            )
+        );
+
+    player.y =
+        Math.max(
+            player.radius,
+            Math.min(
+                canvas.height - player.radius,
+                player.y
+            )
+        );
+
+}
+
+
+/* =========================
+   UPDATE ASTEROIDS
+========================= */
+
+function updateAsteroids(delta) {
+
+    const difficulty =
+        1 +
+        Math.min(score / 650, 1.7);
+
+    for (const asteroid of asteroids) {
+
+        asteroid.x +=
+            asteroid.vx *
+            difficulty *
+            delta;
+
+        asteroid.y +=
+            asteroid.vy *
+            difficulty *
+            delta;
+
+        asteroid.rotation +=
+            asteroid.rotationSpeed *
+            delta;
+
+    }
+
+    asteroids =
+        asteroids.filter(function(asteroid) {
+
+            return (
+                asteroid.x > -120 &&
+                asteroid.x < canvas.width + 120 &&
+                asteroid.y > -120 &&
+                asteroid.y < canvas.height + 120
+            );
+
+        });
+
+}
+
+
+/* =========================
+   COLLISION
+========================= */
+
+function checkCollision() {
+
+    for (const asteroid of asteroids) {
+
+        const dx =
+            asteroid.x -
+            player.x;
+
+        const dy =
+            asteroid.y -
+            player.y;
+
+        const distance =
+            Math.sqrt(
+                dx * dx +
+                dy * dy
+            );
+
+        if (
+            distance <
+            asteroid.radius +
+            player.radius -
+            5
+        ) {
+
+            return true;
+
+        }
+
+    }
+
+    return false;
+
+}
+
+
+/* =========================
+   DRAW STARS
+========================= */
+
+function drawStars(delta) {
+
+    ctx.fillStyle = "#ffffff";
+
+    for (const star of stars) {
+
+        star.y += star.speed * delta;
+
+        if (star.y > canvas.height) {
+            star.y = 0;
+        }
+
+        ctx.globalAlpha =
+            0.3 +
+            Math.random() * 0.6;
+
+        ctx.beginPath();
+
+        ctx.arc(
+            star.x,
+            star.y,
+            star.size,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+    }
+
+    ctx.globalAlpha = 1;
+
+}
+
+
+/* =========================
+   DRAW ASTEROIDS
+========================= */
+
+function drawAsteroids() {
+
+    for (const asteroid of asteroids) {
+
+        ctx.save();
+
+        ctx.translate(
+            asteroid.x,
+            asteroid.y
+        );
+
+        ctx.rotate(
+            asteroid.rotation
+        );
+
+        ctx.beginPath();
+
+        for (
+            let i = 0;
+            i < asteroid.shape.length;
+            i++
+        ) {
+
+            const angle =
+                i *
+                Math.PI *
+                2 /
+                asteroid.shape.length;
+
+            const radius =
+                asteroid.radius *
+                asteroid.shape[i];
+
+            const x =
+                Math.cos(angle) *
+                radius;
+
+            const y =
+                Math.sin(angle) *
+                radius;
+
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+
+        }
+
+        ctx.closePath();
+
+        ctx.fillStyle = "#626b83";
+        ctx.fill();
+
+        ctx.strokeStyle = "#aeb7ca";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.restore();
+
+    }
+
+}
+
+
+/* =========================
+   DRAW PLAYER
+========================= */
+
+function drawPlayer() {
+
+    ctx.save();
+
+    ctx.translate(
+        player.x,
+        player.y
+    );
+
+    let rotation = 0;
+
+    if (keys["ArrowLeft"] || keys["a"]) {
+        rotation = -0.2;
+    }
+
+    if (keys["ArrowRight"] || keys["d"]) {
+        rotation = 0.2;
+    }
+
+    ctx.rotate(rotation);
+
+    // Engine flame
+
+    ctx.fillStyle = "#ffad32";
+
+    ctx.beginPath();
+
+    ctx.moveTo(-18, 0);
+    ctx.lineTo(-31, 8);
+    ctx.lineTo(-25, 0);
+    ctx.lineTo(-31, -8);
+
+    ctx.closePath();
+
+    ctx.fill();
+
+    // Rocket
+
+    ctx.fillStyle = "#e9f1ff";
+
+    ctx.beginPath();
+
+    ctx.moveTo(23, 0);
+    ctx.lineTo(-14, -14);
+    ctx.lineTo(-9, 0);
+    ctx.lineTo(-14, 14);
+
+    ctx.closePath();
+
+    ctx.fill();
+
+    ctx.strokeStyle = "#91a4d8";
+    ctx.stroke();
+
+    // Window
+
+    ctx.fillStyle = "#7457ff";
+
+    ctx.beginPath();
+
+    ctx.arc(
+        4,
+        0,
+        6,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.restore();
+
+}
+
+
+/* =========================
+   DRAW GAME
+========================= */
+
+function drawGame(delta) {
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    // Background
+
+    const gradient =
+        ctx.createRadialGradient(
+            canvas.width / 2,
+            canvas.height / 2,
+            50,
+            canvas.width / 2,
+            canvas.height / 2,
+            canvas.width
+        );
+
+    gradient.addColorStop(
+        0,
+        "#111a3d"
+    );
+
+    gradient.addColorStop(
+        1,
+        "#02040d"
+    );
+
+    ctx.fillStyle = gradient;
+
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    drawStars(delta);
+
+    drawAsteroids();
+
+    drawPlayer();
+
+}
+
+
+/* =========================
+   MAIN LOOP
+========================= */
+
+function gameLoop(currentTime) {
+
+    if (!running) {
+        return;
+    }
+
+    const delta =
+        Math.min(
+            (currentTime - lastTime) / 1000,
+            0.035
+        );
+
+    lastTime = currentTime;
+
+    score +=
+        delta * 10;
+
+    const difficulty =
+        1 +
+        Math.min(score / 650, 1.7);
+
+    speedDisplay.textContent =
+        difficulty.toFixed(1) + "x";
+
+    scoreDisplay.textContent =
+        Math.floor(score);
+
+    updatePlayer(delta);
+
+    spawnTimer -= delta;
+
+    if (spawnTimer <= 0) {
+
+        createAsteroid();
+
+        spawnTimer =
+            Math.max(
+                0.35,
+                0.9 -
+                score / 1100
+            ) / difficulty;
+
+    }
+
+    updateAsteroids(delta);
+
+    drawGame(delta);
+
+    if (checkCollision()) {
+
+        gameOver();
+
+        return;
+
+    }
+
+    requestAnimationFrame(gameLoop);
+
+}
+
+
+/* =========================
+   START BUTTON
+========================= */
+
+startButton.addEventListener(
+    "click",
+    startGame
+);
+
+
+/* =========================
+   MOBILE CONTROLS
+========================= */
+
+document
+.querySelectorAll("[data-key]")
+.forEach(function(button) {
+
+    button.addEventListener(
+        "pointerdown",
+        function(event) {
+
+            event.preventDefault();
+
+            keys[
+                button.dataset.key
+            ] = true;
+
+        }
+    );
+
+    button.addEventListener(
+        "pointerup",
+        function() {
+
+            keys[
+                button.dataset.key
+            ] = false;
+
+        }
+    );
+
+    button.addEventListener(
+        "pointerleave",
+        function() {
+
+            keys[
+                button.dataset.key
+            ] = false;
+
+        }
+    );
+
+});
+
+
+/* =========================
+   DRAW INITIAL SCREEN
+========================= */
+
+drawGame(0);
+
+</script>
+
+</body>
+</html>
